@@ -1,6 +1,56 @@
-import React from "react";
+"use client";
+
+import React, { useEffect, useState } from "react";
+
+interface Category {
+  _id: string; // Updated to match API response
+  name: string; // Updated from 'title' to 'name'
+  slug: string;
+}
 
 export default function Footer() {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchCategories() {
+      try {
+        // Ensure the URL is absolute. If NEXT_PUBLIC_API_URL provides the base, use it.
+        // Fallback to localhost if missing, though user said it's in env.
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+        const apiUrl = `${baseUrl}/api/categories`;
+
+        console.log(`[Footer] Fetching categories from: ${apiUrl}`);
+
+        const res = await fetch(apiUrl); // Client-side fetch
+
+        console.log(`[Footer] Response status: ${res.status}`);
+
+        if (!res.ok) {
+          console.error(`[Footer] Failed to fetch categories: ${res.status} ${res.statusText}`);
+          return;
+        }
+
+        const responseData = await res.json();
+        console.log(`[Footer] Fetched data:`, responseData);
+
+        if (responseData.success && Array.isArray(responseData.data)) {
+          setCategories(responseData.data);
+        } else {
+          console.error("[Footer] Unexpected API response format:", responseData);
+          setCategories([]);
+        }
+
+      } catch (error) {
+        console.error("[Footer] Error fetching categories:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchCategories();
+  }, []);
+
   return (
     <footer className="bg-zinc-50 pt-16 pb-8 text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -44,16 +94,19 @@ export default function Footer() {
           <div>
             <h3 className="mb-4 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Categories</h3>
             <ul className="space-y-2 text-xs">
-              <li><a href="#" className="hover:text-zinc-900 dark:hover:text-zinc-100">Farewell cards</a></li>
-              <li><a href="#" className="hover:text-zinc-900 dark:hover:text-zinc-100">Birthday Greeting Cards</a></li>
-              <li><a href="#" className="hover:text-zinc-900 dark:hover:text-zinc-100">Birth Greeting Cards</a></li>
-              <li><a href="#" className="hover:text-zinc-900 dark:hover:text-zinc-100">Birthday Cards</a></li>
-              <li><a href="#" className="hover:text-zinc-900 dark:hover:text-zinc-100">Anniversary Cards</a></li>
-              <li><a href="#" className="hover:text-zinc-900 dark:hover:text-zinc-100">Wedding Greeting Cards</a></li>
-              <li><a href="#" className="hover:text-zinc-900 dark:hover:text-zinc-100">Wedding Cards</a></li>
-              <li><a href="#" className="hover:text-zinc-900 dark:hover:text-zinc-100">Sympathy Cards</a></li>
-              <li><a href="#" className="hover:text-zinc-900 dark:hover:text-zinc-100">Postcards</a></li>
-              <li><a href="#" className="hover:text-zinc-900 dark:hover:text-zinc-100">Get well cards</a></li>
+              {loading ? (
+                <li>Loading categories...</li>
+              ) : categories.length > 0 ? (
+                categories.map((category) => (
+                  <li key={category._id}>
+                    <a href={`/category/${category.slug}`} className="hover:text-zinc-900 dark:hover:text-zinc-100">
+                      {category.name}
+                    </a>
+                  </li>
+                ))
+              ) : (
+                <li>No categories available</li>
+              )}
             </ul>
           </div>
 

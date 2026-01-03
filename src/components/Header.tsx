@@ -1,12 +1,42 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Dancing_Script } from "next/font/google";
 import { useCart } from "@/context/CartContext";
 import { useFavorites } from "@/context/FavoritesContext";
 
 const brandScript = Dancing_Script({ subsets: ["latin"], weight: "700" });
+
+interface Category {
+  name: string;
+  href: string;
+}
+
+const PRODUCT_CATEGORIES = [
+  { name: "Abschied", href: "/collection/abschied" },
+  { name: "Geburtstag", href: "/collection/geburtstag" },
+  { name: "Geburt", href: "/collection/geburt" },
+  { name: "Glückwünsche", href: "/collection/glueckwuensche" },
+  { name: "Hochzeit", href: "/collection/hochzeit" },
+  { name: "Trauer", href: "/collection/trauer" },
+  { name: "Weihnachten", href: "/collection/weihnachten" },
+  { name: "Postkarten", href: "/collection/postkarten" },
+  { name: "Anlässe", href: "/collection/anlaesse" },
+  { name: "Blog", href: "/blog" },
+];
+
+const DEFAULT_BLOG_CATEGORIES = [
+  { name: "Inspiration", href: "/blog/inspiration" },
+  { name: "DIY", href: "/blog/diy" },
+  { name: "Design", href: "/blog/design" },
+  { name: "Humor", href: "/blog/humor" },
+  { name: "Guides", href: "/blog/guides" },
+  { name: "Crafts", href: "/blog/crafts" },
+  { name: "Interviews", href: "/blog/interviews" },
+  { name: "Shop", href: "/" },
+];
 
 const NavLink = ({ href, children }: { href: string; children: React.ReactNode }) => (
   <Link
@@ -28,13 +58,53 @@ const MobileNavLink = ({ href, children, onClick }: { href: string; children: Re
 );
 
 export default function Header() {
+  const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [blogCategories, setBlogCategories] = useState<Category[]>(DEFAULT_BLOG_CATEGORIES);
   const { cartItems, toggleCart } = useCart();
   const { favorites } = useFavorites();
   
+  const isBlogSection = pathname?.startsWith("/blog");
+
+  useEffect(() => {
+    const fetchBlogCategories = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+        if (!apiUrl) {
+          console.warn("API URL not found");
+          return;
+        }
+
+        const response = await fetch(`${apiUrl}/api/categories`);
+        if (!response.ok) throw new Error("Failed to fetch categories");
+        
+        const data = await response.json();
+        const categoriesData = data.data || [];
+        
+        const mappedCategories = categoriesData.map((cat: any) => ({
+          name: cat.name,
+          href: `/blog/${cat.slug || cat.id}`
+        }));
+        
+        // Add "Shop" link at the end
+        setBlogCategories([...mappedCategories, { name: "Shop", href: "/" }]);
+      } catch (error) {
+        console.error("Error fetching blog categories:", error);
+        // Fallback is already set to DEFAULT_BLOG_CATEGORIES
+      }
+    };
+
+    if (isBlogSection) {
+      console.log("Fetching blog categories...");
+      fetchBlogCategories();
+    }
+  }, [isBlogSection]);
+
+  const categories = isBlogSection ? blogCategories : PRODUCT_CATEGORIES;
+
   const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
   const favoritesCount = favorites ? favorites.length : 0;
 
@@ -172,16 +242,11 @@ export default function Header() {
         {/* Desktop Navigation Row (Hidden on Mobile) */}
         <div className="hidden md:flex h-12 items-center justify-center border-t border-zinc-100 dark:border-zinc-800">
           <nav className="flex items-center gap-4">
-            <NavLink href="/collection/abschied">Abschied</NavLink>
-            <NavLink href="/collection/geburtstag">Geburtstag</NavLink>
-            <NavLink href="/collection/geburt">Geburt</NavLink>
-            <NavLink href="/collection/glueckwuensche">Glückwünsche</NavLink>
-            <NavLink href="/collection/hochzeit">Hochzeit</NavLink>
-            <NavLink href="/collection/trauer">Trauer</NavLink>
-            <NavLink href="/collection/weihnachten">Weihnachten</NavLink>
-            <NavLink href="/collection/postkarten">Postkarten</NavLink>
-            <NavLink href="/collection/anlaesse">Anlässe</NavLink>
-            <NavLink href="/blog">Blog</NavLink>
+            {categories.map((category) => (
+              <NavLink key={category.href} href={category.href}>
+                {category.name}
+              </NavLink>
+            ))}
           </nav>
         </div>
       </div>
@@ -190,18 +255,21 @@ export default function Header() {
       {isMobileMenuOpen && (
         <div className="md:hidden border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-black absolute w-full left-0 shadow-lg h-screen overflow-y-auto pb-20">
           <nav className="flex flex-col py-4">
-            <MobileNavLink href="/collection/abschied" onClick={() => setIsMobileMenuOpen(false)}>Abschied</MobileNavLink>
-            <MobileNavLink href="/collection/geburtstag" onClick={() => setIsMobileMenuOpen(false)}>Geburtstag</MobileNavLink>
-            <MobileNavLink href="/collection/geburt" onClick={() => setIsMobileMenuOpen(false)}>Geburt</MobileNavLink>
-            <MobileNavLink href="/collection/glueckwuensche" onClick={() => setIsMobileMenuOpen(false)}>Glückwünsche</MobileNavLink>
-            <MobileNavLink href="/collection/hochzeit" onClick={() => setIsMobileMenuOpen(false)}>Hochzeit</MobileNavLink>
-            <MobileNavLink href="/collection/trauer" onClick={() => setIsMobileMenuOpen(false)}>Trauer</MobileNavLink>
-            <MobileNavLink href="/collection/weihnachten" onClick={() => setIsMobileMenuOpen(false)}>Weihnachten</MobileNavLink>
-            <MobileNavLink href="/collection/postkarten" onClick={() => setIsMobileMenuOpen(false)}>Postkarten</MobileNavLink>
-            <MobileNavLink href="/collection/anlaesse" onClick={() => setIsMobileMenuOpen(false)}>Anlässe</MobileNavLink>
-            <div className="my-2 border-t border-zinc-100 dark:border-zinc-800" />
-            <MobileNavLink href="/blog" onClick={() => setIsMobileMenuOpen(false)}>Blog</MobileNavLink>
-            <MobileNavLink href="#" onClick={() => setIsMobileMenuOpen(false)}>Ratgeber</MobileNavLink>
+            {categories.map((category) => (
+              <MobileNavLink
+                key={category.href}
+                href={category.href}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                {category.name}
+              </MobileNavLink>
+            ))}
+            {!isBlogSection && (
+              <>
+                <div className="my-2 border-t border-zinc-100 dark:border-zinc-800" />
+                <MobileNavLink href="#" onClick={() => setIsMobileMenuOpen(false)}>Ratgeber</MobileNavLink>
+              </>
+            )}
             <div className="my-2 border-t border-zinc-100 dark:border-zinc-800" />
             <MobileNavLink href="#" onClick={() => setIsMobileMenuOpen(false)}>Account</MobileNavLink>
             <MobileNavLink href="#" onClick={() => setIsMobileMenuOpen(false)}>Wishlist</MobileNavLink>

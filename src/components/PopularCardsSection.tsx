@@ -1,132 +1,59 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ProductCard, { ProductItem } from "@/components/ProductCard";
 
-const products: ProductItem[] = [
-  {
-    title:
-      "Birthday Card with Sparkler and Golden Font Happy Birthday Noble Greeting Card Birthday Modern Festive Double Card",
-    price: "€2,75",
-    image: "/bird.jpg",
-    alt: "Happy Birthday card with golden sparkler design",
-    href: "/product/birthday-card-sparkler",
-  },
-  {
-    title:
-      "Birthday Card \"Just Be Yourself\" — Humorous Frog Illustration in Yellow & Green, Creative Congratulations for Individuality",
-    price: "€2,90",
-    image: "/donkey.jpg",
-    alt: "Humorous frog birthday card in yellow and green",
-    href: "/product/birthday-card-frog",
-  },
-  {
-    title:
-      "Birthday Card Funny for Seniors with Saying Top Fit and Bottom Dense Birthday Card Red Glasses Star Vintage Design",
-    price: "€2,90",
-    image: "/camera-man.jpg",
-    alt: "Vintage red glasses themed birthday card for seniors",
-    href: "/product/birthday-card-seniors",
-  },
-  {
-    title:
-      "Birthday Card with Floral Motif and Butterfly in Blue Purple Watercolor Birthday Greeting Card Noble Design",
-    price: "€2,75",
-    image: "/nature.jpg",
-    alt: "Blue and purple watercolor floral birthday card",
-    href: "/product/birthday-card-floral",
-  },
-  {
-    title:
-      "Birthday Card with Flower Meadow and Happy Birthday Colorful Double Card for Personal Birthday",
-    price: "€2,75",
-    image: "/sunny-girl.jpg",
-    alt: "Colorful flower meadow birthday card",
-    href: "/product/birthday-card-meadow",
-  },
-    {
-    title:
-      "Birthday Card with Sparkler and Golden Font Happy Birthday Noble Greeting Card Birthday Modern Festive Double Card",
-    price: "€2,75",
-    image: "/bird.jpg",
-    alt: "Happy Birthday card with golden sparkler design",
-    href: "#",
-  },
-  {
-    title:
-      "Birthday Card \"Just Be Yourself\" — Humorous Frog Illustration in Yellow & Green, Creative Congratulations for Individuality",
-    price: "€2,90",
-    image: "/donkey.jpg",
-    alt: "Humorous frog birthday card in yellow and green",
-    href: "#",
-  },
-  {
-    title:
-      "Birthday Card Funny for Seniors with Saying Top Fit and Bottom Dense Birthday Card Red Glasses Star Vintage Design",
-    price: "€2,90",
-    image: "/camera-man.jpg",
-    alt: "Vintage red glasses themed birthday card for seniors",
-    href: "#",
-  },
-  {
-    title:
-      "Birthday Card with Floral Motif and Butterfly in Blue Purple Watercolor Birthday Greeting Card Noble Design",
-    price: "€2,75",
-    image: "/nature.jpg",
-    alt: "Blue and purple watercolor floral birthday card",
-    href: "#",
-  },
-  {
-    title:
-      "Birthday Card with Flower Meadow and Happy Birthday Colorful Double Card for Personal Birthday",
-    price: "€2,75",
-    image: "/sunny-girl.jpg",
-    alt: "Colorful flower meadow birthday card",
-    href: "#",
-  },
-  {
-    title:
-      "Birthday Card with Sparkler and Golden Font Happy Birthday Noble Greeting Card Birthday Modern Festive Double Card",
-    price: "€2,75",
-    image: "/bird.jpg",
-    alt: "Happy Birthday card with golden sparkler design",
-    href: "#",
-  },
-  {
-    title:
-      "Birthday Card \"Just Be Yourself\" — Humorous Frog Illustration in Yellow & Green, Creative Congratulations for Individuality",
-    price: "€2,90",
-    image: "/donkey.jpg",
-    alt: "Humorous frog birthday card in yellow and green",
-    href: "#",
-  },
-  {
-    title:
-      "Birthday Card Funny for Seniors with Saying Top Fit and Bottom Dense Birthday Card Red Glasses Star Vintage Design",
-    price: "€2,90",
-    image: "/camera-man.jpg",
-    alt: "Vintage red glasses themed birthday card for seniors",
-    href: "#",
-  },
-  {
-    title:
-      "Birthday Card with Floral Motif and Butterfly in Blue Purple Watercolor Birthday Greeting Card Noble Design",
-    price: "€2,75",
-    image: "/nature.jpg",
-    alt: "Blue and purple watercolor floral birthday card",
-    href: "#",
-  },
-  {
-    title:
-      "Birthday Card with Flower Meadow and Happy Birthday Colorful Double Card for Personal Birthday",
-    price: "€2,75",
-    image: "/sunny-girl.jpg",
-    alt: "Colorful flower meadow birthday card",
-    href: "#",
-  },
-];
+interface APIProduct {
+  _id: string;
+  productData: {
+    title: string;
+    slug: string;
+    price: {
+      formatted: string;
+    };
+    images: string[];
+  };
+}
 
 export default function PopularCardsSection() {
+  const [products, setProducts] = useState<ProductItem[]>([]);
   const [visibleCount, setVisibleCount] = useState(10);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchProducts() {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+        // Fetch a larger batch to allow client-side 'load more'
+        const res = await fetch(`${baseUrl}/api/products?limit=50`);
+        if (!res.ok) throw new Error("Failed to fetch products");
+
+        const json = await res.json();
+        if (json.success && Array.isArray(json.products)) {
+          const mappedProducts: ProductItem[] = json.products.map((p: APIProduct) => ({
+            title: p.productData.title,
+            price: p.productData.price.formatted,
+            image: p.productData.images[0] || "/placeholder.jpg",
+            alt: p.productData.title,
+            href: `/product/${p.productData.slug}`,
+          }));
+
+          // Shuffle the products randomly
+          for (let i = mappedProducts.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [mappedProducts[i], mappedProducts[j]] = [mappedProducts[j], mappedProducts[i]];
+          }
+
+          setProducts(mappedProducts);
+        }
+      } catch (error) {
+        console.error("Error fetching popular cards:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchProducts();
+  }, []);
 
   const handleLoadMore = () => {
     setVisibleCount((prev) => prev + 5);
@@ -136,19 +63,22 @@ export default function PopularCardsSection() {
     <section className="mt-12">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xl font-semibold">Popular cards from our collections</h3>
-        <nav className="flex gap-4 text-sm">
-          <a href="#" className="text-accent hover:underline">Birthday Cards</a>
-          <a href="#" className="text-zinc-600 hover:text-accent">Birthday cards</a>
-          <a href="#" className="text-zinc-600 hover:text-accent">Art Postcards</a>
-          <a href="#" className="text-zinc-600 hover:text-accent">Sympathy Cards</a>
-        </nav>
+        {/* Removed category nav as per user feedback that products don't have categories in this context */}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {products.slice(0, visibleCount).map((p, idx) => (
-          <ProductCard key={idx} {...p} />
-        ))}
-      </div>
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="aspect-[4/3] w-full bg-zinc-100 dark:bg-zinc-800 animate-pulse rounded-md" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {products.slice(0, visibleCount).map((p, idx) => (
+            <ProductCard key={idx} {...p} />
+          ))}
+        </div>
+      )}
 
       {visibleCount < products.length && (
         <div className="mt-8 flex justify-center">

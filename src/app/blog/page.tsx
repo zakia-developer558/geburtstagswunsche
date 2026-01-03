@@ -1,292 +1,360 @@
-import React from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import ArticleProductCard from "@/components/ArticleProductCard";
 
-// Mock Data
-const heroArticles = [
-  {
-    title: "The Art of Handwritten Notes in a Digital World",
-    image: "/bird.jpg",
-    category: "Inspiration",
-    href: "/blog/handwritten-notes",
-    date: "Dec 29, 2025",
-    description: "Why taking the time to write a physical note matters more than ever in our fast-paced digital lives."
-  },
-  {
-    title: "5 Creative Ways to Upcycle Old Greeting Cards",
-    image: "/donkey.jpg",
-    category: "DIY",
-    href: "/blog/upcycle-cards",
-    date: "Dec 28, 2025"
-  },
-  {
-    title: "The Best Fonts for Your Wedding Invitations",
-    image: "/nature.jpg",
-    category: "Design",
-    href: "/blog/wedding-fonts",
-    date: "Dec 27, 2025"
-  }
-];
+// Types
+interface RawBlogPost {
+  _id: string;
+  postId: string;
+  slug: string;
+  categoryId?: string;
+  language?: string;
+  status?: string;
+  blogContent: {
+    title: string;
+    content: string;
+    htmlContent?: string;
+    metaTitle?: string;
+    metaDescription?: string;
+    wordCount?: number;
+  };
+  firebaseImages: Array<{
+    url: string;
+    alt?: string;
+    width?: number;
+    height?: number;
+  }>;
+  createdAt: string;
+  updatedAt: string;
+}
 
-const latestArticles = [
-  {
-    title: "New Year, New Stationery: Trends to Watch",
-    image: "/sunny-girl.jpg",
-    alt: "Stationery trends",
-    href: "/blog/stationery-trends",
-    date: "Dec 26, 2025",
-    description: "Discover the hottest colors, patterns, and paper types for the upcoming year."
-  },
-  {
-    title: "How to Choose the Perfect Birthday Card",
-    image: "/camera-man.jpg",
-    alt: "Birthday card selection",
-    href: "/blog/perfect-birthday-card",
-    date: "Dec 25, 2025",
-    description: "A guide to finding a card that matches the recipient's personality perfectly."
-  },
-  {
-    title: "The History of Valentine's Day Cards",
-    image: "/bird.jpg",
-    alt: "Valentine's history",
-    href: "/blog/valentines-history",
-    date: "Dec 24, 2025",
-    description: "From handmade tokens to mass-produced masterpieces, explore the evolution of love notes."
-  },
-  {
-    title: "Sustainable Paper: What You Need to Know",
-    image: "/donkey.jpg",
-    alt: "Sustainable paper",
-    href: "/blog/sustainable-paper",
-    date: "Dec 23, 2025",
-    description: "Understanding the environmental impact of your stationery choices."
-  },
-  {
-    title: "Calligraphy 101: Getting Started",
-    image: "/nature.jpg",
-    alt: "Calligraphy",
-    href: "/blog/calligraphy-101",
-    date: "Dec 22, 2025",
-    description: "Simple tips and tricks for beginners to start creating beautiful lettering."
-  },
-  {
-    title: "Organizing Your Desk for Creativity",
-    image: "/sunny-girl.jpg",
-    alt: "Desk organization",
-    href: "/blog/desk-organization",
-    date: "Dec 21, 2025",
-    description: "Create a workspace that inspires you to write and create every day."
-  }
-];
+interface BlogPost {
+  _id: string;
+  title: string;
+  slug: string;
+  excerpt?: string;
+  content?: string;
+  coverImage?: string;
+  categorySlug?: string;
+  createdAt: string;
+  author?: {
+    name: string;
+  };
+}
 
-const trendingArticles = [
-  {
-    title: "Top 10 Funny Birthday Wishes",
-    image: "/camera-man.jpg",
-    category: "Humor",
-    href: "/blog/funny-wishes",
-    views: "2.5k reads"
-  },
-  {
-    title: "Emotional Condolence Messages",
-    image: "/nature.jpg",
-    category: "Guides",
-    href: "/blog/condolence-messages",
-    views: "1.8k reads"
-  },
-  {
-    title: "DIY: Pressed Flower Cards",
-    image: "/bird.jpg",
-    category: "Crafts",
-    href: "/blog/pressed-flowers",
-    views: "1.5k reads"
-  },
-  {
-    title: "Interview with Artist Anna Bell",
-    image: "/donkey.jpg",
-    category: "Interviews",
-    href: "/blog/anna-bell-interview",
-    views: "1.2k reads"
-  }
-];
+interface Category {
+  _id: string;
+  name: string;
+  slug: string;
+}
 
-const inspirationArticles = [
-  {
-    title: "Spring Collection Preview",
-    image: "/sunny-girl.jpg",
-    href: "/blog/spring-collection",
-    date: "Dec 20, 2025"
-  },
-  {
-    title: "Minimalist Card Designs",
-    image: "/bird.jpg",
-    href: "/blog/minimalist-designs",
-    date: "Dec 19, 2025"
-  },
-  {
-    title: "Choosing the Right Pen",
-    image: "/nature.jpg",
-    href: "/blog/choosing-pens",
-    date: "Dec 18, 2025"
-  },
-  {
-    title: "Etiquette for Thank You Notes",
-    image: "/camera-man.jpg",
-    href: "/blog/thank-you-etiquette",
-    date: "Dec 17, 2025"
-  }
-];
+interface PostsResponse {
+  success: boolean;
+  posts: RawBlogPost[];
+}
+
+interface CategoriesResponse {
+  success: boolean;
+  data: Category[];
+}
 
 export default function BlogPage() {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [heroPosts, setHeroPosts] = useState<BlogPost[]>([]);
+  const [cat2Posts, setCat2Posts] = useState<BlogPost[]>([]);
+  const [allPosts, setAllPosts] = useState<BlogPost[]>([]);
+  
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Pagination for "All Posts"
+  const [page, setPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+
+  // Helper to map raw posts to UI posts
+  const mapPosts = (rawPosts: RawBlogPost[]): BlogPost[] => {
+    return rawPosts.map((raw) => ({
+      _id: raw._id,
+      title: raw.blogContent?.title || "Untitled Post",
+      slug: raw.slug,
+      excerpt: raw.blogContent?.metaDescription || raw.blogContent?.content?.substring(0, 100) || "No description available.",
+      content: raw.blogContent?.content || "",
+      coverImage: raw.firebaseImages?.[0]?.url || "/bird.jpg",
+      categorySlug: raw.categoryId || "Blog",
+      createdAt: raw.createdAt,
+      author: { name: "Team" },
+    }));
+  };
+
+  useEffect(() => {
+    async function initData() {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+        if (!apiUrl) {
+          setError("API URL not configured");
+          setLoading(false);
+          return;
+        }
+
+        console.log("BlogPage: Fetching initial data...");
+
+        // 1. Fetch Categories
+        const catRes = await fetch(`${apiUrl}/api/categories`);
+        if (!catRes.ok) throw new Error("Failed to fetch categories");
+        const catData: CategoriesResponse = await catRes.json();
+        const cats = catData.data || [];
+        setCategories(cats);
+
+        // Prepare fetch promises
+        const promises = [];
+
+        // 2. Fetch Hero Posts (Category 1)
+        if (cats.length > 0) {
+          promises.push(
+            fetch(`${apiUrl}/api/posts?categorySlug=${cats[0].slug}&page=1&limit=3`)
+              .then(res => res.json())
+              .then((data: PostsResponse) => setHeroPosts(mapPosts(data.posts || [])))
+              .catch(err => console.error("Error fetching hero posts:", err))
+          );
+        }
+
+        // 3. Fetch Category 2 Posts
+        if (cats.length > 1) {
+          promises.push(
+            fetch(`${apiUrl}/api/posts?categorySlug=${cats[1].slug}&page=1&limit=3`)
+              .then(res => res.json())
+              .then((data: PostsResponse) => setCat2Posts(mapPosts(data.posts || [])))
+              .catch(err => console.error("Error fetching cat2 posts:", err))
+          );
+        }
+
+        // 4. Fetch All Posts (Page 1)
+        promises.push(
+          fetch(`${apiUrl}/api/posts?page=1&limit=9`)
+            .then(res => res.json())
+            .then((data: PostsResponse) => {
+              const mapped = mapPosts(data.posts || []);
+              setAllPosts(mapped);
+              if (mapped.length < 9) setHasMore(false);
+            })
+            .catch(err => console.error("Error fetching all posts:", err))
+        );
+
+        await Promise.all(promises);
+
+      } catch (err: any) {
+        console.error("Error initializing blog page:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    initData();
+  }, []);
+
+  const loadMorePosts = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const nextPage = page + 1;
+      const res = await fetch(`${apiUrl}/api/posts?page=${nextPage}&limit=9`);
+      const data: PostsResponse = await res.json();
+      const newPosts = mapPosts(data.posts || []);
+
+      if (newPosts.length > 0) {
+        setAllPosts(prev => [...prev, ...newPosts]);
+        setPage(nextPage);
+        if (newPosts.length < 9) setHasMore(false);
+      } else {
+        setHasMore(false);
+      }
+    } catch (error) {
+      console.error("Error loading more posts:", error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Helper to format date
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  // Prepare Hero Data
+  const mainHeroPost = heroPosts[0];
+  const heroArticle = mainHeroPost ? {
+    title: mainHeroPost.title,
+    image: mainHeroPost.coverImage || "/bird.jpg",
+    category: categories[0]?.name || "Featured",
+    href: `/blog/${mainHeroPost.slug}`,
+    date: formatDate(mainHeroPost.createdAt),
+    description: mainHeroPost.excerpt || "Read our latest article...",
+  } : null;
+
+  const sideHeroPosts = heroPosts.slice(1, 3).map(post => ({
+    title: post.title,
+    image: post.coverImage || "/nature.jpg",
+    category: categories[0]?.name || "Featured",
+    href: `/blog/${post.slug}`,
+    date: formatDate(post.createdAt),
+  }));
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-20 text-center">
+        <p className="text-zinc-500 text-lg">Loading posts...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 py-12 space-y-20">
       
-      {/* SECTION 1: HERO / FEATURED (1 Large, 2 Small) */}
+      {/* SECTION 1: HERO (Category 1) */}
       <section>
-        <h1 className="text-4xl md:text-5xl font-serif font-bold text-zinc-900 mb-12">The Greeting Card Blog</h1>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Main Hero Article */}
-          <Link href={heroArticles[0].href} className="group relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-zinc-100 block">
-            <Image
-              src={heroArticles[0].image}
-              alt={heroArticles[0].title}
-              fill
-              className="object-cover transition-transform duration-500 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-8 flex flex-col justify-end text-white">
-              <span className="text-sm font-medium bg-purple-600 w-fit px-3 py-1 rounded-full mb-3">
-                {heroArticles[0].category}
-              </span>
-              <h2 className="text-2xl md:text-4xl font-serif font-bold leading-tight mb-2 group-hover:underline decoration-white underline-offset-4">
-                {heroArticles[0].title}
-              </h2>
-              <p className="text-zinc-200 line-clamp-2 md:text-lg">
-                {heroArticles[0].description}
-              </p>
-            </div>
-          </Link>
+        <h1 className="text-4xl md:text-5xl font-serif font-bold text-zinc-900 mb-12">Blogs</h1>
+        
+        {heroArticle ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Main Hero Article */}
+            <Link href={heroArticle.href} className="group relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-zinc-100 block">
+              <Image
+                src={heroArticle.image}
+                alt={heroArticle.title}
+                fill
+                className="object-cover transition-transform duration-500 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-8 flex flex-col justify-end text-white">
+                <span className="text-sm font-medium bg-purple-600 w-fit px-3 py-1 rounded-full mb-3 uppercase">
+                  {heroArticle.category}
+                </span>
+                <h2 className="text-2xl md:text-4xl font-serif font-bold leading-tight mb-2 group-hover:underline decoration-white underline-offset-4">
+                  {heroArticle.title}
+                </h2>
+                <p className="text-zinc-200 line-clamp-2 md:text-lg">
+                  {heroArticle.description}
+                </p>
+              </div>
+            </Link>
 
-          {/* Side Hero Articles */}
-          <div className="flex flex-col gap-8">
-            {heroArticles.slice(1).map((article, idx) => (
-              <Link key={idx} href={article.href} className="group flex gap-4 h-full">
-                <div className="relative aspect-square w-1/3 overflow-hidden rounded-lg bg-zinc-100">
-                  <Image
-                    src={article.image}
-                    alt={article.title}
-                    fill
-                    className="object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                </div>
-                <div className="flex flex-col justify-center w-2/3">
-                  <span className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-1">
-                    {article.category}
-                  </span>
-                  <h3 className="text-xl font-serif font-bold text-zinc-900 leading-tight mb-2 group-hover:underline">
-                    {article.title}
-                  </h3>
-                  <span className="text-sm text-zinc-500">{article.date}</span>
-                </div>
-              </Link>
-            ))}
+            {/* Side Hero Articles */}
+            {sideHeroPosts.length > 0 && (
+              <div className="flex flex-col gap-8">
+                {sideHeroPosts.map((article, idx) => (
+                  <Link key={idx} href={article.href} className="group flex gap-4 h-full">
+                    <div className="relative aspect-square w-1/3 overflow-hidden rounded-lg bg-zinc-100">
+                      <Image
+                        src={article.image}
+                        alt={article.title}
+                        fill
+                        className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    </div>
+                    <div className="flex flex-col justify-center w-2/3">
+                      <span className="text-xs font-bold text-purple-600 uppercase tracking-wide mb-1">
+                        {article.category}
+                      </span>
+                      <h3 className="text-xl font-serif font-bold text-zinc-900 leading-tight mb-2 group-hover:underline">
+                        {article.title}
+                      </h3>
+                      <span className="text-sm text-zinc-500">{article.date}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
+        ) : (
+          <div className="text-center py-20 bg-zinc-50 rounded-lg border border-dashed border-zinc-200">
+             <p className="text-zinc-500">No featured posts found.</p>
+          </div>
+        )}
       </section>
 
-      {/* SECTION 2: LATEST ARTICLES (Grid using ArticleProductCard) */}
+      {/* SECTION 2: Category 2 Posts */}
+      {categories.length > 1 && cat2Posts.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-3xl font-serif font-bold text-zinc-900">{categories[1].name}</h2>
+            <Link href={`/blog/${categories[1].slug}`} className="text-sm font-medium text-zinc-600 hover:text-purple-600">
+              View all {categories[1].name} →
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {cat2Posts.map((post, idx) => (
+               <ArticleProductCard 
+                 key={idx}
+                 title={post.title}
+                 image={post.coverImage || "/camera-man.jpg"}
+                 alt={post.title}
+                 href={`/blog/${post.slug}`}
+                 date={formatDate(post.createdAt)}
+                 description={post.excerpt}
+               />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* SECTION 3: ALL POSTS with Load More */}
       <section>
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-3xl font-serif font-bold text-zinc-900">Latest Stories</h2>
-          <Link href="#" className="text-sm font-medium text-zinc-600 hover:text-purple-600">View all →</Link>
+          <h2 className="text-3xl font-serif font-bold text-zinc-900">All Stories</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {latestArticles.map((article, idx) => (
-            <ArticleProductCard key={idx} {...article} />
-          ))}
-        </div>
-      </section>
-
-      {/* SECTION 3: TRENDING (Horizontal List Style) */}
-      <section className="bg-zinc-50 -mx-4 sm:-mx-6 px-4 sm:px-6 py-16">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-serif font-bold text-zinc-900 mb-10 text-center">Trending Now</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {trendingArticles.map((article, idx) => (
-              <Link key={idx} href={article.href} className="group bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all border border-zinc-100">
-                <div className="relative aspect-[3/2] w-full overflow-hidden rounded-lg mb-4 bg-zinc-100">
-                  <Image
-                    src={article.image}
-                    alt={article.title}
-                    fill
-                    className="object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                  <span className="absolute top-2 left-2 bg-white/90 backdrop-blur text-xs font-bold px-2 py-1 rounded text-zinc-900">
-                    #{idx + 1}
-                  </span>
-                </div>
-                <span className="text-xs font-medium text-purple-600 uppercase tracking-wider">
-                  {article.category}
-                </span>
-                <h3 className="font-bold text-zinc-900 mt-1 mb-2 leading-tight group-hover:text-purple-700">
-                  {article.title}
-                </h3>
-                <span className="text-xs text-zinc-400">{article.views}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 4: INSPIRATION (Compact List / Sidebar Style) */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-        <div className="lg:col-span-2">
-          <h2 className="text-2xl font-serif font-bold text-zinc-900 mb-6">Daily Inspiration</h2>
-          <div className="space-y-8">
-            {inspirationArticles.map((article, idx) => (
-              <Link key={idx} href={article.href} className="group flex items-center gap-6 border-b border-zinc-100 pb-8 last:border-0 last:pb-0">
-                <div className="relative aspect-[4/3] w-32 sm:w-48 overflow-hidden rounded-lg bg-zinc-100 flex-shrink-0">
-                   <Image
-                    src={article.image}
-                    alt={article.title}
-                    fill
-                    className="object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                </div>
-                <div>
-                  <h3 className="text-lg sm:text-xl font-bold text-zinc-900 mb-2 group-hover:underline decoration-zinc-300 underline-offset-4">
-                    {article.title}
-                  </h3>
-                  <p className="text-zinc-500 text-sm mb-3">
-                    Looking for fresh ideas? Check out this curated collection of beautiful designs...
-                  </p>
-                  <span className="text-xs text-zinc-400 font-medium">{article.date}</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Sidebar / Newsletter or Categories */}
-        <div className="space-y-8">
-          <div className="bg-purple-50 p-6 rounded-xl border border-purple-100">
-            <h3 className="font-serif font-bold text-xl text-purple-900 mb-2">Subscribe to our Newsletter</h3>
-            <p className="text-purple-800/80 text-sm mb-4">Get the latest trends and offers directly in your inbox.</p>
-            <input type="email" placeholder="Your email address" className="w-full px-4 py-2 rounded-lg border border-purple-200 mb-3 focus:outline-none focus:ring-2 focus:ring-purple-300" />
-            <button className="w-full bg-purple-600 text-white font-medium py-2 rounded-lg hover:bg-purple-700 transition-colors">
-              Subscribe
-            </button>
-          </div>
-
-          <div>
-            <h3 className="font-bold text-zinc-900 mb-4">Popular Tags</h3>
-            <div className="flex flex-wrap gap-2">
-              {['Birthday', 'Wedding', 'DIY', 'Interviews', 'Sustainable', 'Typography', 'Quotes', 'History'].map(tag => (
-                <Link key={tag} href="#" className="px-3 py-1 bg-zinc-100 text-zinc-600 text-xs rounded-full hover:bg-zinc-200 transition-colors">
-                  #{tag}
-                </Link>
+        
+        {allPosts.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+              {allPosts.map((post, idx) => (
+                <ArticleProductCard 
+                  key={idx}
+                  title={post.title}
+                  image={post.coverImage || "/camera-man.jpg"}
+                  alt={post.title}
+                  href={`/blog/${post.slug}`}
+                  date={formatDate(post.createdAt)}
+                  description={post.excerpt}
+                />
               ))}
             </div>
+
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="flex justify-center">
+                <button 
+                  onClick={loadMorePosts}
+                  disabled={loadingMore}
+                  className="px-8 py-3 bg-white border border-zinc-300 text-zinc-900 font-medium rounded-full hover:bg-zinc-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loadingMore ? "Loading..." : "Load More Articles"}
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-zinc-500">No articles found.</p>
+          </div>
+        )}
+      </section>
+
+      {/* Ad Banner Section */}
+      <section className="w-full max-w-5xl mx-auto mt-20 mb-12">
+        <div className="bg-zinc-50 border border-dashed border-zinc-300 rounded-xl p-8 flex flex-col items-center justify-center min-h-[250px] text-center">
+          <span className="text-zinc-400 text-xs font-medium uppercase tracking-widest mb-4">Advertisement</span>
+          <div className="w-full max-w-[728px] h-[90px] bg-zinc-200 rounded flex items-center justify-center">
+            <span className="text-zinc-500 font-medium">Ad Banner Space (728x90)</span>
           </div>
         </div>
       </section>
